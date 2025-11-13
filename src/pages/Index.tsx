@@ -1,16 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import * as XLSX from 'xlsx';
-import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import MaterialsTab from '@/components/MaterialsTab';
+import TransactionsTab from '@/components/TransactionsTab';
+import OrdersTab from '@/components/OrdersTab';
+import DashboardTab from '@/components/DashboardTab';
 
 interface Material {
   id: number;
@@ -127,16 +122,6 @@ export default function Index() {
     };
   }, [materials, transactions, orders]);
 
-  const getStatusBadge = (status: Material['status']) => {
-    const statusConfig = {
-      'in-stock': { label: 'В наличии', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      'medium': { label: 'Средний', className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
-      'low': { label: 'Низкий', className: 'bg-red-100 text-red-800 hover:bg-red-100' },
-    };
-    const config = statusConfig[status];
-    return <Badge className={config.className}><Icon name="AlertCircle" size={14} className="mr-1" />{config.label}</Badge>;
-  };
-
   const handleWriteOff = (materialId: number, quantity: number) => {
     setMaterials(prev => prev.map(m => {
       if (m.id === materialId) {
@@ -206,48 +191,6 @@ export default function Index() {
     }
   };
 
-  const exportToExcel = (type: 'materials' | 'transactions' | 'orders') => {
-    let data: any[] = [];
-    let filename = '';
-
-    if (type === 'materials') {
-      data = materials.map(m => ({
-        'ID': m.id,
-        'Название': m.name,
-        'Описание': m.description,
-        'Текущий запас': `${m.currentStock} ${m.unit}`,
-        'Минимальный запас': `${m.minStock} ${m.unit}`,
-        'Цена': `${m.price} ₽`,
-        'Статус': m.status === 'in-stock' ? 'В наличии' : m.status === 'medium' ? 'Средний' : 'Низкий'
-      }));
-      filename = 'Материалы';
-    } else if (type === 'transactions') {
-      data = transactions.map(t => ({
-        'ID': t.id,
-        'Материал': t.materialName,
-        'Тип': t.type === 'in' ? 'Приход' : 'Расход',
-        'Количество': t.quantity,
-        'Дата': t.date,
-        'Примечание': t.note
-      }));
-      filename = 'Транзакции';
-    } else if (type === 'orders') {
-      data = orders.map(o => ({
-        'ID': o.id,
-        'Материал': o.materialName,
-        'Количество': o.quantity,
-        'Статус': o.status === 'pending' ? 'В ожидании' : o.status === 'completed' ? 'Выполнен' : 'Отменен',
-        'Дата': o.date
-      }));
-      filename = 'Заказы';
-    }
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, filename);
-    XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
@@ -290,347 +233,40 @@ export default function Index() {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Всего материалов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-gray-900">{materials.length}</div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Общая стоимость</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-gray-900">{dashboardData.totalValue.toLocaleString()} ₽</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Критичных запасов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-red-600">{criticalMaterials.length}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Активных заказов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">{dashboardData.orderStats.pending}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Распределение по статусам</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={dashboardData.pieData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value }) => `${name}: ${value}`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {dashboardData.pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Уровни запасов</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.stockData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="Текущий запас" fill="#3b82f6" />
-                      <Bar dataKey="Мин. запас" fill="#ef4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Активность транзакций</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-gray-600">Приход</p>
-                      <p className="text-2xl font-bold text-green-700">{dashboardData.transactionsByType.in}</p>
-                    </div>
-                    <Icon name="ArrowDown" className="text-green-600" size={32} />
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
-                    <div>
-                      <p className="text-sm text-gray-600">Расход</p>
-                      <p className="text-2xl font-bold text-orange-700">{dashboardData.transactionsByType.out}</p>
-                    </div>
-                    <Icon name="ArrowUp" className="text-orange-600" size={32} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <DashboardTab
+              materials={materials}
+              criticalMaterials={criticalMaterials}
+              dashboardData={dashboardData}
+            />
           </TabsContent>
 
           <TabsContent value="materials" className="space-y-4">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex gap-4 mb-6 items-center">
-                <Button 
-                  onClick={() => exportToExcel('materials')} 
-                  variant="outline"
-                  className="shrink-0"
-                >
-                  <Icon name="Download" size={16} className="mr-2" />
-                  Экспорт в Excel
-                </Button>
-                <div className="relative flex-1">
-                  <Icon name="Search" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <Input
-                    placeholder="Поиск по названию или описанию..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Все статусы" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все статусы</SelectItem>
-                    <SelectItem value="in-stock">В наличии</SelectItem>
-                    <SelectItem value="medium">Средний</SelectItem>
-                    <SelectItem value="low">Низкий</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">ID</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Название</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Описание</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Текущий запас</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Мин. запас</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Цена</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Статус</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-700">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredMaterials.map((material) => (
-                      <tr key={material.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-4 text-sm text-gray-900">{material.id}</td>
-                        <td className="py-3 px-4 text-sm font-medium text-gray-900">{material.name}</td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{material.description}</td>
-                        <td className="py-3 px-4 text-sm text-gray-900 font-semibold">{material.currentStock} {material.unit}</td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{material.minStock} {material.unit}</td>
-                        <td className="py-3 px-4 text-sm text-gray-900">{material.price} ₽</td>
-                        <td className="py-3 px-4">{getStatusBadge(material.status)}</td>
-                        <td className="py-3 px-4">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-800 hover:bg-blue-50">
-                                Списать
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Списать материал: {material.name}</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4 py-4">
-                                <div>
-                                  <Label>Количество для списания</Label>
-                                  <Input
-                                    type="number"
-                                    placeholder="0"
-                                    onChange={(e) => setNewTransaction({ ...newTransaction, materialId: material.id, quantity: Number(e.target.value) })}
-                                  />
-                                </div>
-                                <div>
-                                  <Label>Примечание</Label>
-                                  <Input
-                                    placeholder="Причина списания..."
-                                    onChange={(e) => setNewTransaction({ ...newTransaction, note: e.target.value })}
-                                  />
-                                </div>
-                                <Button
-                                  className="w-full"
-                                  onClick={() => {
-                                    handleWriteOff(material.id, newTransaction.quantity);
-                                    setNewTransaction({ materialId: 0, type: 'out', quantity: 0, note: '' });
-                                  }}
-                                >
-                                  Подтвердить списание
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <MaterialsTab
+              materials={materials}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              filteredMaterials={filteredMaterials}
+              handleWriteOff={handleWriteOff}
+              newTransaction={newTransaction}
+              setNewTransaction={setNewTransaction}
+            />
           </TabsContent>
 
           <TabsContent value="transactions" className="space-y-4">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <Icon name="History" size={20} className="mr-2" />
-                  История транзакций
-                </h2>
-                <Button 
-                  onClick={() => exportToExcel('transactions')} 
-                  variant="outline"
-                >
-                  <Icon name="Download" size={16} className="mr-2" />
-                  Экспорт в Excel
-                </Button>
-              </div>
-              <div className="space-y-3">
-                {transactions.map((transaction) => (
-                  <div key={transaction.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={transaction.type === 'in' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}>
-                            <Icon name={transaction.type === 'in' ? 'ArrowDown' : 'ArrowUp'} size={14} className="mr-1" />
-                            {transaction.type === 'in' ? 'Приход' : 'Расход'}
-                          </Badge>
-                          <span className="text-sm font-medium text-gray-900">{transaction.materialName}</span>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-1">Количество: <span className="font-semibold">{transaction.quantity}</span></p>
-                        <p className="text-xs text-gray-500">{transaction.note}</p>
-                      </div>
-                      <span className="text-xs text-gray-500">{transaction.date}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TransactionsTab transactions={transactions} />
           </TabsContent>
 
           <TabsContent value="orders" className="space-y-4">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <Icon name="ShoppingCart" size={20} className="mr-2" />
-                  Заказы на пополнение
-                </h2>
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => exportToExcel('orders')} 
-                    variant="outline"
-                  >
-                    <Icon name="Download" size={16} className="mr-2" />
-                    Экспорт
-                  </Button>
-                  <Dialog>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Icon name="Plus" size={16} className="mr-2" />
-                      Создать заказ
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Новый заказ на пополнение</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label>Материал</Label>
-                        <Select onValueChange={(value) => setNewOrder({ ...newOrder, materialId: Number(value) })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите материал" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {materials.map(m => (
-                              <SelectItem key={m.id} value={m.id.toString()}>{m.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Количество</Label>
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          onChange={(e) => setNewOrder({ ...newOrder, quantity: Number(e.target.value) })}
-                        />
-                      </div>
-                      <Button className="w-full" onClick={handleCreateOrder}>
-                        Создать заказ
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {orders.map((order) => (
-                  <div key={order.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={
-                            order.status === 'pending' ? 'bg-blue-100 text-blue-800' :
-                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }>
-                            {order.status === 'pending' ? 'В ожидании' : order.status === 'completed' ? 'Выполнен' : 'Отменен'}
-                          </Badge>
-                          <span className="text-sm font-medium text-gray-900">{order.materialName}</span>
-                        </div>
-                        <p className="text-sm text-gray-600">Количество: <span className="font-semibold">{order.quantity}</span></p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className="text-xs text-gray-500">{order.date}</span>
-                        {order.status === 'pending' && (
-                          <Button size="sm" onClick={() => handleCompleteOrder(order.id)} className="bg-green-600 hover:bg-green-700">
-                            <Icon name="Check" size={14} className="mr-1" />
-                            Завершить
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <OrdersTab
+              orders={orders}
+              materials={materials}
+              newOrder={newOrder}
+              setNewOrder={setNewOrder}
+              handleCreateOrder={handleCreateOrder}
+              handleCompleteOrder={handleCompleteOrder}
+            />
           </TabsContent>
         </Tabs>
       </div>
