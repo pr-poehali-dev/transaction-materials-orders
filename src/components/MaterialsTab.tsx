@@ -27,6 +27,7 @@ interface MaterialsTabProps {
   setStatusFilter: (filter: string) => void;
   filteredMaterials: Material[];
   handleWriteOff: (materialId: number, quantity: number) => void;
+  handleAddMaterial: (material: Omit<Material, 'id' | 'status'>) => void;
   newTransaction: {
     materialId: number;
     type: 'in' | 'out';
@@ -44,9 +45,18 @@ export default function MaterialsTab({
   setStatusFilter,
   filteredMaterials,
   handleWriteOff,
+  handleAddMaterial,
   newTransaction,
   setNewTransaction,
 }: MaterialsTabProps) {
+  const [newMaterial, setNewMaterial] = useState({
+    name: '',
+    description: '',
+    currentStock: 0,
+    minStock: 0,
+    price: 0,
+    unit: 'кг',
+  });
   const getStatusBadge = (status: Material['status']) => {
     const statusConfig = {
       'in-stock': { label: 'В наличии', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
@@ -77,6 +87,94 @@ export default function MaterialsTab({
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
       <div className="flex gap-4 mb-6 items-center">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="shrink-0">
+              <Icon name="Plus" size={16} className="mr-2" />
+              Добавить материал
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Новый материал</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Название</Label>
+                <Input
+                  placeholder="Название материала"
+                  value={newMaterial.name}
+                  onChange={(e) => setNewMaterial({ ...newMaterial, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Описание</Label>
+                <Input
+                  placeholder="Описание материала"
+                  value={newMaterial.description}
+                  onChange={(e) => setNewMaterial({ ...newMaterial, description: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Текущий запас</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={newMaterial.currentStock}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, currentStock: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label>Минимальный запас</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={newMaterial.minStock}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, minStock: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Цена (₽)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={newMaterial.price}
+                    onChange={(e) => setNewMaterial({ ...newMaterial, price: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label>Единица измерения</Label>
+                  <Select value={newMaterial.unit} onValueChange={(value) => setNewMaterial({ ...newMaterial, unit: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="кг">кг</SelectItem>
+                      <SelectItem value="шт">шт</SelectItem>
+                      <SelectItem value="л">л</SelectItem>
+                      <SelectItem value="м">м</SelectItem>
+                      <SelectItem value="упак">упак</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (newMaterial.name && newMaterial.currentStock >= 0 && newMaterial.minStock >= 0 && newMaterial.price >= 0) {
+                    handleAddMaterial(newMaterial);
+                    setNewMaterial({ name: '', description: '', currentStock: 0, minStock: 0, price: 0, unit: 'кг' });
+                  }
+                }}
+              >
+                Добавить материал
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <Button 
           onClick={exportToExcel} 
           variant="outline"

@@ -191,6 +191,31 @@ export default function Index() {
     }
   };
 
+  const handleAddMaterial = (material: Omit<Material, 'id' | 'status'>) => {
+    const newId = materials.length > 0 ? Math.max(...materials.map(m => m.id)) + 1 : 1;
+    let status: Material['status'] = 'in-stock';
+    if (material.currentStock <= material.minStock) status = 'low';
+    else if (material.currentStock <= material.minStock * 1.5) status = 'medium';
+
+    const newMaterial: Material = {
+      ...material,
+      id: newId,
+      status,
+    };
+
+    setMaterials(prev => [...prev, newMaterial]);
+
+    setTransactions(prev => [{
+      id: prev.length + 1,
+      materialId: newId,
+      materialName: material.name,
+      type: 'in',
+      quantity: material.currentStock,
+      date: new Date().toISOString().split('T')[0],
+      note: 'Добавление нового материала',
+    }, ...prev]);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
@@ -249,6 +274,7 @@ export default function Index() {
               setStatusFilter={setStatusFilter}
               filteredMaterials={filteredMaterials}
               handleWriteOff={handleWriteOff}
+              handleAddMaterial={handleAddMaterial}
               newTransaction={newTransaction}
               setNewTransaction={setNewTransaction}
             />
