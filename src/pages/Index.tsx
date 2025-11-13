@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
 
 interface Material {
   id: number;
@@ -162,12 +163,56 @@ export default function Index() {
     }
   };
 
+  const exportToExcel = (type: 'materials' | 'transactions' | 'orders') => {
+    let data: any[] = [];
+    let filename = '';
+
+    if (type === 'materials') {
+      data = materials.map(m => ({
+        'ID': m.id,
+        'Название': m.name,
+        'Описание': m.description,
+        'Текущий запас': `${m.currentStock} ${m.unit}`,
+        'Минимальный запас': `${m.minStock} ${m.unit}`,
+        'Цена': `${m.price} ₽`,
+        'Статус': m.status === 'in-stock' ? 'В наличии' : m.status === 'medium' ? 'Средний' : 'Низкий'
+      }));
+      filename = 'Материалы';
+    } else if (type === 'transactions') {
+      data = transactions.map(t => ({
+        'ID': t.id,
+        'Материал': t.materialName,
+        'Тип': t.type === 'in' ? 'Приход' : 'Расход',
+        'Количество': t.quantity,
+        'Дата': t.date,
+        'Примечание': t.note
+      }));
+      filename = 'Транзакции';
+    } else if (type === 'orders') {
+      data = orders.map(o => ({
+        'ID': o.id,
+        'Материал': o.materialName,
+        'Количество': o.quantity,
+        'Статус': o.status === 'pending' ? 'В ожидании' : o.status === 'completed' ? 'Выполнен' : 'Отменен',
+        'Дата': o.date
+      }));
+      filename = 'Заказы';
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, filename);
+    XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Управление материалами</h1>
-          <p className="text-gray-600">Система учета складских запасов</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Управление материалами</h1>
+            <p className="text-gray-600">Система учета складских запасов</p>
+          </div>
         </div>
 
         {criticalMaterials.length > 0 && (
@@ -199,7 +244,15 @@ export default function Index() {
 
           <TabsContent value="materials" className="space-y-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex gap-4 mb-6">
+              <div className="flex gap-4 mb-6 items-center">
+                <Button 
+                  onClick={() => exportToExcel('materials')} 
+                  variant="outline"
+                  className="shrink-0"
+                >
+                  <Icon name="Download" size={16} className="mr-2" />
+                  Экспорт в Excel
+                </Button>
                 <div className="relative flex-1">
                   <Icon name="Search" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                   <Input
@@ -296,10 +349,19 @@ export default function Index() {
 
           <TabsContent value="transactions" className="space-y-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <Icon name="History" size={20} className="mr-2" />
-                История транзакций
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold flex items-center">
+                  <Icon name="History" size={20} className="mr-2" />
+                  История транзакций
+                </h2>
+                <Button 
+                  onClick={() => exportToExcel('transactions')} 
+                  variant="outline"
+                >
+                  <Icon name="Download" size={16} className="mr-2" />
+                  Экспорт в Excel
+                </Button>
+              </div>
               <div className="space-y-3">
                 {transactions.map((transaction) => (
                   <div key={transaction.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -330,7 +392,15 @@ export default function Index() {
                   <Icon name="ShoppingCart" size={20} className="mr-2" />
                   Заказы на пополнение
                 </h2>
-                <Dialog>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => exportToExcel('orders')} 
+                    variant="outline"
+                  >
+                    <Icon name="Download" size={16} className="mr-2" />
+                    Экспорт
+                  </Button>
+                  <Dialog>
                   <DialogTrigger asChild>
                     <Button>
                       <Icon name="Plus" size={16} className="mr-2" />
@@ -369,6 +439,7 @@ export default function Index() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               </div>
               <div className="space-y-3">
                 {orders.map((order) => (
