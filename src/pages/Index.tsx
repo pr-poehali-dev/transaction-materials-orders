@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import * as XLSX from 'xlsx';
+import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Material {
   id: number;
@@ -83,6 +85,47 @@ export default function Index() {
   });
 
   const criticalMaterials = materials.filter(m => m.currentStock <= m.minStock);
+
+  const dashboardData = useMemo(() => {
+    const statusCount = {
+      'in-stock': materials.filter(m => m.status === 'in-stock').length,
+      'medium': materials.filter(m => m.status === 'medium').length,
+      'low': materials.filter(m => m.status === 'low').length,
+    };
+
+    const pieData = [
+      { name: 'В наличии', value: statusCount['in-stock'], color: '#86efac' },
+      { name: 'Средний', value: statusCount['medium'], color: '#fde047' },
+      { name: 'Низкий', value: statusCount['low'], color: '#fca5a5' },
+    ];
+
+    const stockData = materials.map(m => ({
+      name: m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name,
+      'Текущий запас': m.currentStock,
+      'Мин. запас': m.minStock,
+    }));
+
+    const transactionsByType = {
+      in: transactions.filter(t => t.type === 'in').reduce((sum, t) => sum + t.quantity, 0),
+      out: transactions.filter(t => t.type === 'out').reduce((sum, t) => sum + t.quantity, 0),
+    };
+
+    const totalValue = materials.reduce((sum, m) => sum + (m.currentStock * m.price), 0);
+
+    const orderStats = {
+      pending: orders.filter(o => o.status === 'pending').length,
+      completed: orders.filter(o => o.status === 'completed').length,
+    };
+
+    return {
+      statusCount,
+      pieData,
+      stockData,
+      transactionsByType,
+      totalValue,
+      orderStats,
+    };
+  }, [materials, transactions, orders]);
 
   const getStatusBadge = (status: Material['status']) => {
     const statusConfig = {
@@ -226,8 +269,12 @@ export default function Index() {
           </Alert>
         )}
 
-        <Tabs defaultValue="materials" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsTrigger value="dashboard">
+              <Icon name="BarChart3" size={16} className="mr-2" />
+              Дашборд
+            </TabsTrigger>
             <TabsTrigger value="materials">
               <Icon name="Package" size={16} className="mr-2" />
               Материалы
@@ -241,6 +288,118 @@ export default function Index() {
               Заказы
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Всего материалов</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-gray-900">{materials.length}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Общая стоимость</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-gray-900">{dashboardData.totalValue.toLocaleString()} ₽</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Критичных запасов</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-red-600">{criticalMaterials.length}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Активных заказов</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">{dashboardData.orderStats.pending}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Распределение по статусам</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={dashboardData.pieData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value }) => `${name}: ${value}`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {dashboardData.pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Уровни запасов</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dashboardData.stockData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="Текущий запас" fill="#3b82f6" />
+                      <Bar dataKey="Мин. запас" fill="#ef4444" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Активность транзакций</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">Приход</p>
+                      <p className="text-2xl font-bold text-green-700">{dashboardData.transactionsByType.in}</p>
+                    </div>
+                    <Icon name="ArrowDown" className="text-green-600" size={32} />
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-600">Расход</p>
+                      <p className="text-2xl font-bold text-orange-700">{dashboardData.transactionsByType.out}</p>
+                    </div>
+                    <Icon name="ArrowUp" className="text-orange-600" size={32} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="materials" className="space-y-4">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
